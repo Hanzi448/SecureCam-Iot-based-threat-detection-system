@@ -18,6 +18,9 @@ def create_app():
     from api.health import bp as health_bp
     app.register_blueprint(health_bp, url_prefix="/api")
 
+    from api.frame_routes import bp as frame_bp
+    app.register_blueprint(frame_bp, url_prefix="/api")
+
     return app
 
 if __name__ == "__main__":
