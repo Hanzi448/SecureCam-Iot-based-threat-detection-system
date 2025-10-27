@@ -15,9 +15,9 @@ class Config:
     CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
 
     # SMTP
-    SMTP_USER = os.getenv("SMTP_USER")
-    SMTP_PASS = os.getenv("SMTP_PASS")
-    ALERT_EMAILS = [e.strip() for e in os.getenv("ALERT_EMAILS","").split(",") if e.strip()]
+    GMAIL_USER = os.getenv("GMAIL_USER", "your_email@gmail.com")
+    GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "your_app_password")  # not your normal password
+    ALERT_EMAIL_TO = os.getenv("ALERT_EMAIL_TO", "recipient_email@gmail.com")
 
     # thresholds
     WEAPON_CONF_THRESHOLD = float(os.getenv("WEAPON_CONF_THRESHOLD", 0.4))
