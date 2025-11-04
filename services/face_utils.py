@@ -1,4 +1,3 @@
-# services/face_utils.py
 import numpy as np
 from extensions import db
 from models.watchlist import Watchlist
@@ -34,3 +33,17 @@ def load_all_watchlist_embeddings():
     if not embs:
         return [], [], np.empty((0, 512))
     return ids, names, np.vstack(embs)
+
+
+# ✅ NEW FUNCTION
+def delete_watchlist_entry(watchlist_id: int) -> bool:
+    """Delete a watchlist entry by ID."""
+    entry = Watchlist.query.get(watchlist_id)
+    if not entry:
+        print(f"[DB] Watchlist entry with ID {watchlist_id} not found.")
+        return False
+
+    db.session.delete(entry)
+    db.session.commit()
+    print(f"[DB] Deleted watchlist entry (id={watchlist_id}, name={entry.name})")
+    return True

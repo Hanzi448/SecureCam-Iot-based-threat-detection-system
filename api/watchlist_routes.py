@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify
 import numpy as np
 import cv2
 import os
-from services.face_utils import save_watchlist_entry
+from services.face_utils import save_watchlist_entry, delete_watchlist_entry
 from services.storage import upload_image
 from ml.facenet_wrapper import get_embeddings
 
@@ -11,6 +11,7 @@ bp = Blueprint("watchlist", __name__)
 
 DATA_DIR = "data/watchlist/tmp"
 os.makedirs(DATA_DIR, exist_ok=True)
+
 
 @bp.route("/watchlist/add", methods=["POST"])
 def add_watchlist():
@@ -49,3 +50,16 @@ def add_watchlist():
         "status": "added",
         "image_url": cloud_url
     })
+
+
+@bp.route("/watchlist/<int:watchlist_id>", methods=["DELETE"])
+def delete_watchlist(watchlist_id):
+    """Delete a watchlist entry by ID."""
+    try:
+        success = delete_watchlist_entry(watchlist_id)
+        if success:
+            return jsonify({"status": "deleted", "id": watchlist_id}), 200
+        else:
+            return jsonify({"error": "Entry not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

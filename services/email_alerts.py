@@ -50,7 +50,15 @@ def send_alert(result: dict, subject: str = None, recipient_email: str = None):
     if result.get("cloud_url"):
         lines.append(f"\nAnnotated Image: {result['cloud_url']}")
 
-    lines.append("\nPlease review the surveillance footage immediately.")
+    if result.get("suspicious_detected"):
+        lines.append("⚠️ Suspicious activity detected — possible masked or unknown face.")
+    elif result.get("weapon_detected"):
+        lines.append("🚨 Weapon detected — please review immediately.")
+    elif result.get("criminal_detected"):
+        lines.append(f"🚨 Known criminal {result.get('criminal_name', 'Unknown')} identified.")
+    else:
+        lines.append("System update — no critical threats detected.")
+
     body = "\n".join(lines)
 
     # --- Construct message ---

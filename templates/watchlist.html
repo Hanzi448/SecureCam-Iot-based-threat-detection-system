@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="card">
+  <div class="card-header"><strong>Watchlist</strong></div>
+  <div class="card-body">
+    <div id="watchlistBox" class="row g-3">
+      {% for w in watchlist %}
+      <div class="col-md-3">
+        <div class="watch-card p-2">
+          <img src="{{ w.image_url }}" class="img-fluid mb-2" alt="img">
+          <div><strong>{{ w.name }}</strong></div>
+          <div class="small text-muted">{{ w.added_at.strftime("%Y-%m-%d") }}</div>
+          <div class="mt-2">
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteWatch('{{ w.id }}')">Delete</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+  async function deleteWatch(id){
+    if(!confirm("Delete this watchlist entry?")) return;
+    const res = await fetch(`/api/watchlist/${id}`, { method: "DELETE" });
+    if(res.ok) location.reload();
+    else alert("Failed to delete");
+  }
+</script>
+{% endblock %}

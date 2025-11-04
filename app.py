@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template
 from config import Config
 from extensions import db, socketio
 
@@ -22,9 +22,16 @@ def create_app():
     from api.watchlist_routes import bp as watchlist_bp
     app.register_blueprint(watchlist_bp, url_prefix="/api")
 
+    from api.camera_routes import bp as camera_bp
+    app.register_blueprint(camera_bp)
+
     @app.route("/")
-    def index():
-        return jsonify({"message": "Smart Surveillance API running 🚀"})
+    def home():
+        return render_template("index.html")
+
+    @app.route("/live")
+    def live_window():
+        return render_template("live_window.html")
 
     return app
 

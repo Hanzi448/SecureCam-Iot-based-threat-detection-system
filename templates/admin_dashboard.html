@@ -1,105 +1,164 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Smart Surveillance Dashboard</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <style>
-    body { background-color: #f8f9fa; }
-    .table tbody tr.highlight-danger {
-      background-color: #ffb3b3 !important;
-      font-weight: bold;
-    }
-    .table tbody tr.highlight-warning {
-      background-color: #fff1b8 !important;
-    }
-  </style>
-</head>
-<body>
+{% extends "layout.html" %}
+{% block content %}
 
-<div class="container mt-4">
-  <h2 class="text-center mb-4">🚨 Smart Surveillance System - Live Alerts</h2>
+{# small inline SVG icons for ticks/cross used repeatedly #}
+{% set svg_check %}
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M6 10.2L3.2 7.4L2.2 8.4L6 12.2L14 4.2L13 3.2L6 10.2Z" fill="currentColor"/>
+</svg>
+{% endset %}
+{% set svg_cross %}
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M4.93 4.93L11.07 11.07M11.07 4.93L4.93 11.07" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+</svg>
+{% endset %}
 
-  <table class="table table-striped table-bordered text-center align-middle" id="eventsTable">
-    <thead class="table-dark">
-      <tr>
-        <th>ID</th>
-        <th>Timestamp</th>
-        <th>Weapon</th>
-        <th>Confidence</th>
-        <th>Criminal Detected</th>
-        <th>Criminal Name</th>
-        <th>Match Distance</th>
-        <th>Frame</th>
-        <th>Alert Sent</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for e in events %}
-      <tr class="{% if e.weapon_detected and e.criminal_detected %}highlight-danger{% elif e.weapon_detected %}highlight-warning{% endif %}">
-        <td>{{ e.id }}</td>
-        <td>{{ e.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-        <td>{% if e.weapon_detected %}✅{% else %}❌{% endif %}</td>
-        <td>{{ "%.2f"|format(e.confidence or 0) }}</td>
-        <td>{% if e.criminal_detected %}✅{% else %}❌{% endif %}</td>
-        <td>{{ e.criminal_name or "-" }}</td>
-        <td>{{ "%.3f"|format(e.match_distance or 0) if e.match_distance else "-" }}</td>
-        <td>
-          {% if e.annotated_url %}
-            <a href="{{ e.annotated_url }}" target="_blank">View</a>
-          {% else %}
-            {{ e.local_path }}
-          {% endif %}
-        </td>
-        <td>{% if e.alert_sent %}✅{% else %}❌{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="stat-card p-3">
+      <div class="stat-title">Total Events</div>
+      <div id="stat_total" class="stat-value">—</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card p-3">
+      <div class="stat-title">Weapons</div>
+      <div id="stat_weapons" class="stat-value text-danger">—</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card p-3">
+      <div class="stat-title">Criminals</div>
+      <div id="stat_criminals" class="stat-value text-warning">—</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card p-3">
+      <div class="stat-title">Suspicious</div>
+      <div id="stat_suspicious" class="stat-value text-info">—</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>Live Events</strong>
+    <div>
+      <select id="filterType" class="form-select form-select-sm d-inline-block" style="width:170px">
+        <option value="all">All</option>
+        <option value="weapon">Weapons</option>
+        <option value="criminal">Criminals</option>
+        <option value="suspicious">Suspicious</option>
+      </select>
+      <button id="clearTable" class="btn btn-sm btn-outline-secondary ms-2">Clear</button>
+    </div>
+  </div>
+
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle">
+        <thead class="table-dark">
+          <tr>
+            <!-- <th>ID</th> -->
+            <th>Time Stamp</th>
+            <th class="text-center">Weapon</th>
+            <th class="text-center">Criminal</th>
+            <th class="text-center">Suspicious</th>
+            <th>Confidence / FaceDist</th>
+            <th>Name</th>
+            <th>Image</th>
+            <th class="text-center">Alert</th>
+          </tr>
+        </thead>
+        <tbody id="eventsBody">
+          {% for e in events %}
+          <tr
+            data-weapon="{{ '1' if e.weapon_detected else '0' }}"
+            data-criminal="{{ '1' if e.criminal_detected else '0' }}"
+            data-suspicious="{{ '1' if e.suspicious else '0' }}"
+          >
+            <!-- <td>{{ e.id }}</td> -->
+            <td>{{ e.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+
+            <td class="text-center">
+              {% if e.weapon_detected %}
+                <span class="icon-true" title="Weapon detected">{{ svg_check|safe }}</span>
+              {% else %}
+                <span class="icon-false" title="No weapon">{{ svg_cross|safe }}</span>
+              {% endif %}
+            </td>
+
+            <td class="text-center">
+              {% if e.criminal_detected %}
+                <span class="icon-true" title="Criminal matched">{{ svg_check|safe }}</span>
+              {% else %}
+                <span class="icon-false" title="Not matched">{{ svg_cross|safe }}</span>
+              {% endif %}
+            </td>
+
+            <td class="text-center">
+              {% if e.suspicious %}
+                <span class="icon-true" title="Suspicious">{{ svg_check|safe }}</span>
+              {% else %}
+                <span class="icon-false" title="Not suspicious">{{ svg_cross|safe }}</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if e.weapon_conf is not none %}
+                <strong>W:</strong> {{ "%.2f"|format(e.weapon_conf) }}
+              {% elif e.confidence is not none %}
+                <strong>C:</strong> {{ "%.2f"|format(e.confidence) }}
+              {% else %}
+                —
+              {% endif %}
+              {% if e.match_distance is not none %}
+                <div class="small text-muted">D: {{ "%.3f"|format(e.match_distance) }}</div>
+              {% endif %}
+            </td>
+
+            <td>{{ e.criminal_name or "—" }}</td>
+
+            <td>
+              {% if e.image_url %}
+                <a href="{{ e.image_url }}" target="_blank" class="link-primary">View</a>
+              {% elif e.local_path %}
+                <span title="{{ e.local_path }}">{{ e.local_path.split('/')[-1].split('\\')[-1] }}</span>
+              {% else %}
+                N/A
+              {% endif %}
+            </td>
+
+            <td class="text-center">
+              {% if e.alert_sent %}
+                <span class="icon-true" title="Alert sent">{{ svg_check|safe }}</span>
+              {% else %}
+                <span class="icon-false" title="No alert">{{ svg_cross|safe }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <script>
-  const socket = io();
-
-  socket.on("connect", () => {
-    console.log("🔌 Connected to live updates");
-  });
-
-  socket.on("new_event", (data) => {
-    console.log("📡 New event:", data);
-    const tableBody = document.getElementById("eventsTable").getElementsByTagName("tbody")[0];
-    const row = tableBody.insertRow(0);
-
-    // Highlight based on severity
-    if (data.weapon_detected && data.criminal_detected) {
-      row.classList.add("highlight-danger");
-    } else if (data.weapon_detected) {
-      row.classList.add("highlight-warning");
-    }
-
-    row.insertCell(0).textContent = data.id;
-    row.insertCell(1).textContent = data.timestamp;
-    row.insertCell(2).textContent = data.weapon_detected ? "✅" : "❌";
-    row.insertCell(3).textContent = data.confidence ? data.confidence.toFixed(2) : "-";
-    row.insertCell(4).textContent = data.criminal_detected ? "✅" : "❌";
-    row.insertCell(5).textContent = data.criminal_name || "-";
-    row.insertCell(6).textContent = data.match_distance ? data.match_distance.toFixed(3) : "-";
-
-    const imgCell = row.insertCell(7);
-    if (data.annotated_url) {
-      const link = document.createElement("a");
-      link.href = data.annotated_url;
-      link.textContent = "View";
-      link.target = "_blank";
-      imgCell.appendChild(link);
-    } else {
-      imgCell.textContent = "N/A";
-    }
-
-    row.insertCell(8).textContent = data.alert_sent ? "✅" : "❌";
+  // initialize counts reading data- attributes
+  document.addEventListener("DOMContentLoaded", () => {
+    const rows = document.querySelectorAll("#eventsBody tr");
+    let tot = rows.length, w=0,c=0,s=0;
+    rows.forEach(r=>{
+      if (r.dataset.weapon === "1") w++;
+      if (r.dataset.criminal === "1") c++;
+      if (r.dataset.suspicious === "1") s++;
+    });
+    document.getElementById("stat_total").textContent = tot;
+    document.getElementById("stat_weapons").textContent = w;
+    document.getElementById("stat_criminals").textContent = c;
+    document.getElementById("stat_suspicious").textContent = s;
   });
 </script>
 
-</body>
-</html>
+{% endblock %}

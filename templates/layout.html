@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title or "SecureCam Admin" }}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+  <div class="admin-shell d-flex">
+    <aside class="sidebar p-3">
+      <a class="brand d-block mb-4" href="/">🛡 SecureCam: Iot-Based Threat Detection System</a>
+      <nav class="nav flex-column">
+        <a class="nav-link" href="/admin">Dashboard</a>
+        <a class="nav-link" href="/admin/add-criminal">Add Criminal</a>
+        <a class="nav-link" href="/admin/watchlist">Watchlist</a>
+      </nav>
+    </aside>
+
+    <div class="main flex-fill">
+      <header class="header d-flex align-items-center justify-content-between px-4 py-2 border-bottom">
+        <div class="header-left d-flex align-items-center gap-3">
+          <button id="sidebarToggle" class="btn btn-sm btn-outline-secondary d-md-none">☰</button>
+          <h5 class="m-0 text-muted">{{ title or "Dashboard" }}</h5>
+        </div>
+        <div class="header-right">
+          <small class="text-muted me-3">Admin</small>
+          <a class="btn btn-sm btn-outline-primary" href="/admin">Refresh</a>
+        </div>
+      </header>
+
+      <main class="p-4">
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer class="text-center py-3 text-muted small">
+        © 2025 Smart Surveillance
+      </footer>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

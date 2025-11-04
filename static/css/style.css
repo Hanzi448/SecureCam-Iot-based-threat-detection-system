@@ -1,0 +1,22 @@
+:root{
+  --bg:#1f2430;
+  --panel:#262b36;
+  --muted:#bfc7d8;
+  --accent:#0d6efd;
+}
+body{ background:var(--bg); color:var(--muted); font-family:Inter,system-ui,Arial; }
+.admin-shell{ min-height:100vh; }
+.sidebar{ width:220px; background:var(--panel); color:var(--muted); }
+.sidebar .brand{ font-weight:700; color:var(--muted); font-size:1.05rem; }
+.sidebar .nav-link{ color:var(--muted); padding:10px 6px; display:block; border-radius:6px; }
+.sidebar .nav-link:hover{ background:rgba(13,110,253,0.06); color:var(--accent); }
+.header{ background:transparent; color:var(--muted); }
+.main{ min-height:100vh; }
+.stat-card{ background:#252934; border-radius:8px; color:var(--muted); }
+.stat-title{ font-size:0.85rem; color:#98a0b3; }
+.stat-value{ font-size:1.5rem; font-weight:700; margin-top:6px; }
+.card{ background: #22262e; border: 1px solid rgba(255,255,255,0.03); color:var(--muted); border-radius:8px; }
+.table thead th{ background:#22262e; color:#cbd5ff; }
+.watch-card{ background:#1e2228; border-radius:6px; padding:8px; text-align:center; }
+.btn-primary{ background:var(--accent); border-color:var(--accent); }
+a{ color:var(--accent); }

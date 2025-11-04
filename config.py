@@ -16,12 +16,22 @@ class Config:
 
     # SMTP
     GMAIL_USER = os.getenv("GMAIL_USER", "your_email@gmail.com")
-    GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "your_app_password")  # not your normal password
+    GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "your_app_password")  # app password only
     ALERT_EMAIL_TO = os.getenv("ALERT_EMAIL_TO", "recipient_email@gmail.com")
 
-    # thresholds
+    # Thresholds
     WEAPON_CONF_THRESHOLD = float(os.getenv("WEAPON_CONF_THRESHOLD", 0.4))
     FACENET_THRESHOLD = float(os.getenv("FACENET_THRESHOLD", 0.45))
     OCULAR_THRESHOLD = float(os.getenv("OCULAR_THRESHOLD", 0.55))
 
-    CAMERA_API_KEY = os.getenv("CAMERA_API_KEY")
+    # Camera
+    CAMERA_API_KEY = os.getenv("CAMERA_API_KEY", "smart_secret_key")
+
+    # Cooldown config
+    EMAIL_COOLDOWN_SECONDS = int(os.getenv("EMAIL_COOLDOWN_SECONDS", "60"))
+    EMAIL_COOLDOWN_SCOPE = "global"  # or "per_criminal"
+
+    ESP32_URL = "http://192.168.137.127"  # Your working ESP32 stream
+    CAMERA_SOURCE = ESP32_URL             # Use ESP32 as main camera source
+    SERVER_URL = "http://127.0.0.1:5000/api/frame"
+    CAPTURE_POST_INTERVAL = 2.0           # seconds
