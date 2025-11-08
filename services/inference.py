@@ -9,49 +9,57 @@ from ml.yolo_wrapper import predict
 from services.storage import upload_image
 from config import Config
 
-# --- NEW imports for FaceNet ---
+# --- Face Recognition Imports ---
 from ml.facenet_wrapper import get_embeddings
 from services.face_utils import load_all_watchlist_embeddings
 from services.matcher import find_best_match
 from services.email_alerts import send_alert
 from services.email_throttle import can_send
 
-
-# Base directories
+# --- Base directories ---
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / "data"
 EVENTS_DIR = DATA_DIR / "events"
 CROPS_DIR = EVENTS_DIR / "crops"
 OUTPUT_DIR = EVENTS_DIR / "annotated"
 
-# Ensure folders exist
 for folder in [EVENTS_DIR, CROPS_DIR, OUTPUT_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 
+# ---------------------------------------------------
+# ESP32 Hardware Alert
+# ---------------------------------------------------
 def trigger_hardware_alert(alert_type: str):
     """
-    Sends a trigger to ESP32 / hardware module.
-    You can set ESP32_ALERT_URL in config to define where to send signal.
+    Sends a trigger to ESP32 hardware via its /alert endpoint.
+    Example:
+      http://192.168.137.210/alert?alert=weapon
     """
     try:
-        esp_url = getattr(Config, "ESP32_ALERT_URL", None)
+        esp_url = getattr(Config, "ESP32_ALERT_URL", "http://192.168.137.210")
         if not esp_url:
+            print("[ESP32] No ESP32_ALERT_URL configured.")
             return
 
-        requests.get(f"{esp_url}?alert={alert_type}", timeout=3)
-        print(f"[ESP32] Hardware alert triggered: {alert_type}")
+        full_url = f"{esp_url}/alert?alert={alert_type}"
+        requests.get(full_url, timeout=3)
+        print(f"[ESP32] Hardware alert sent → {full_url}")
+
     except Exception as e:
-        print(f"[ESP32 WARN] Failed to contact ESP32: {e}")
+        print(f"[ESP32 WARN] Could not send alert: {e}")
 
 
+# ---------------------------------------------------
+# Core Image Processing
+# ---------------------------------------------------
 def process_image(local_path: str):
     """
-    Processes an image:
-    - Runs YOLO weapon detection
-    - Runs FaceNet for criminal recognition
-    - Detects suspicious (masked/unknown faces)
-    - Logs results, emails, and triggers hardware alerts
+    Full detection pipeline:
+    - YOLO weapon detection
+    - FaceNet criminal identification
+    - Suspicious/unknown person detection
+    - Database + Email + Hardware alert triggers
     """
     img = cv2.imread(local_path)
     if img is None:
@@ -62,7 +70,6 @@ def process_image(local_path: str):
     weapon_detected = False
     suspicious_detected = False
     crop_paths = []
-    annotated_path = None
 
     # ---- WEAPON DETECTION ----
     for det in detections:
@@ -82,12 +89,11 @@ def process_image(local_path: str):
             cv2.imwrite(crop_path, crop)
             crop_paths.append(crop_path)
 
-    # Save annotated image
+    # ---- Save annotated frame ----
     annotated_name = f"annotated_{int(time.time() * 1000)}.jpg"
     annotated_path = str(OUTPUT_DIR / annotated_name)
     cv2.imwrite(annotated_path, img)
 
-    # Upload annotated image
     cloud_url = None
     if Config.CLOUDINARY_CLOUD_NAME:
         try:
@@ -99,14 +105,12 @@ def process_image(local_path: str):
     criminal_detected = False
     criminal_name = None
     match_distance = None
-    suspicious_detected = False
 
     try:
         ids, names, db_embs = load_all_watchlist_embeddings()
         faces = get_embeddings(img)
 
         if not faces or len(faces) == 0:
-            # ✅ Do NOT mark as suspicious if no face at all
             print("[INFO] No faces detected — skipping face recognition.")
         else:
             face_matched = False
@@ -117,22 +121,22 @@ def process_image(local_path: str):
                     threshold=getattr(Config, "FACENET_THRESHOLD", 0.40)
                 )
                 if matched:
-                    face_matched = True
                     criminal_detected = True
                     criminal_name = cname
                     match_distance = dist
+                    face_matched = True
                     print(f"[FACENET] Criminal match found: {cname} (dist={dist:.3f})")
                     break
 
             if not face_matched:
-                # suspicious only if face detected but unmatched
                 suspicious_detected = True
-                print("[SUSPICIOUS] Face found but not matched in watchlist (unknown/covered).")
-
+                print("[SUSPICIOUS] Unrecognized or masked face detected.")
     except Exception as e:
         print(f"[FACENET WARN] {e}")
 
-    # ---- ALERT LOGIC (refined priority tree) ----
+    # ---------------------------------------------------
+    # ALERT LOGIC + HARDWARE TRIGGER
+    # ---------------------------------------------------
     result = {
         "weapon_detected": weapon_detected,
         "detections": detections,
@@ -145,46 +149,48 @@ def process_image(local_path: str):
         "cloud_url": cloud_url
     }
 
-    # Choose cooldown key
-    if Config.EMAIL_COOLDOWN_SCOPE == "global":
-        throttle_key = "global"
-    elif Config.EMAIL_COOLDOWN_SCOPE == "per_criminal" and criminal_detected and criminal_name:
-        throttle_key = f"criminal:{criminal_name}"
+    # Decide alert type
+    if weapon_detected and criminal_detected:
+        alert_type = "weapon_criminal"
+        subject = "[ALERT] Weapon + Criminal Detected"
+    elif weapon_detected:
+        alert_type = "weapon"
+        subject = "[ALERT] Weapon Detected"
+    elif criminal_detected:
+        alert_type = "criminal"
+        subject = "[ALERT] Criminal Identified"
+    elif suspicious_detected:
+        alert_type = "suspicious"
+        subject = "[ALERT] Suspicious Individual Detected"
     else:
-        throttle_key = "global"
+        alert_type = None
+        subject = None
 
+    # Send alerts
     try:
-        # Determine which alert to send
-        if weapon_detected and criminal_detected:
-            alert_type = "weapon_criminal"
-            subject = "[ALERT] Weapon + Criminal Detected"
-        elif weapon_detected:
-            alert_type = "weapon"
-            subject = "[ALERT] Weapon Detected"
-        elif criminal_detected:
-            alert_type = "criminal"
-            subject = "[ALERT] Criminal Identified"
-        elif suspicious_detected:
-            alert_type = "suspicious"
-            subject = "[ALERT] Suspicious Individual Detected (Mask / Concealment)"
-        else:
-            alert_type = None
+        if alert_type:
+            # Trigger buzzer/servo via ESP32
+            trigger_hardware_alert(alert_type)
 
-        alert_needed = alert_type is not None
+            # Send email (cooldown controlled)
+            throttle_key = (
+                f"criminal:{criminal_name}"
+                if Config.EMAIL_COOLDOWN_SCOPE == "per_criminal" and criminal_name
+                else "global"
+            )
 
-        if alert_needed:
             if can_send(throttle_key):
                 send_alert(result, subject=subject)
-                trigger_hardware_alert(alert_type)
             else:
-                print(f"[EMAIL] Cooldown active (key={throttle_key})")
+                print(f"[EMAIL] Cooldown active for {throttle_key}")
         else:
-            print("[INFO] No threat detected — skipping email.")
-
+            print("[INFO] No threat detected — skipping alerts.")
     except Exception as e:
-        print(f"[EMAIL WARN] {e}")
+        print(f"[ALERT WARN] {e}")
 
-    # ---- DATABASE LOGGING ----
+    # ---------------------------------------------------
+    # DATABASE LOGGING
+    # ---------------------------------------------------
     try:
         from services.db_ops import log_event
 
@@ -194,12 +200,9 @@ def process_image(local_path: str):
             weapon_conf = detections[0].get("conf")
             confidence = detections[0].get("conf", None)
 
-        image_url = cloud_url
-        local = annotated_path
-
         log_event(
-            image_url=image_url,
-            local_path=local,
+            image_url=cloud_url,
+            local_path=annotated_path,
             weapon_detected=weapon_detected,
             weapon_conf=weapon_conf,
             suspicious=suspicious_detected,
@@ -207,7 +210,7 @@ def process_image(local_path: str):
             criminal_detected=criminal_detected,
             criminal_name=criminal_name,
             match_distance=match_distance,
-            alert_sent=alert_needed
+            alert_sent=bool(alert_type)
         )
     except Exception as e:
         print(f"[DB WARN] Could not log event: {e}")

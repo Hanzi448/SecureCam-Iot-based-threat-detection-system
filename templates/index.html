@@ -1,20 +1,75 @@
 {% extends "layout.html" %}
 {% block content %}
-<div class="container mt-3">
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <h4>Live Monitor</h4>
+
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0">Live SecureCam Monitor</h4>
     <div>
-      <button id="btnStart" class="btn btn-success btn-sm">Start Capture</button>
-      <button id="btnStop" class="btn btn-danger btn-sm ms-2">Stop Capture</button>
+      <button id="btnStart" class="btn btn-success btn-sm">Start Camera</button>
+      <button id="btnStop" class="btn btn-danger btn-sm ms-2">Stop Camera</button>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-body text-center">
-      <img id="liveImg" src="/api/camera/video_feed" alt="Live feed" style="max-width:100%; height:auto; border:1px solid #ddd;"/>
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+      <span>Live Feed</span>
+      <span id="statusText" class="badge bg-secondary">Status: unknown</span>
+    </div>
+
+    <div class="card-body text-center bg-black p-2">
+      <img id="liveImg"
+           src=""
+           alt="Live feed"
+           style="max-width:100%; height:auto; border-radius:10px; border:2px solid #222; background:#000;">
     </div>
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/home.js') }}"></script>
+<script>
+async function postAPI(endpoint) {
+  try {
+    const res = await fetch(endpoint, { method: "POST" });
+    return res.json().catch(() => ({}));
+  } catch (err) {
+    console.error("POST failed:", err);
+    return {};
+  }
+}
+
+async function updateStatus() {
+  try {
+    const res = await fetch("/api/camera/status");
+    const data = await res.json();
+    const badge = document.getElementById("statusText");
+    if (data.running) {
+      badge.textContent = "Status: Running";
+      badge.className = "badge bg-success";
+      document.getElementById("liveImg").src = "/api/camera/video_feed?ts=" + Date.now();
+    } else {
+      badge.textContent = "Status: Stopped";
+      badge.className = "badge bg-danger";
+      document.getElementById("liveImg").src = "";
+    }
+  } catch (e) {
+    console.warn("Status check failed:", e);
+    const badge = document.getElementById("statusText");
+    badge.textContent = "Status: Error";
+    badge.className = "badge bg-warning text-dark";
+  }
+}
+
+document.getElementById("btnStart").addEventListener("click", async () => {
+  await postAPI("/api/camera/start");
+  setTimeout(updateStatus, 800);
+});
+
+document.getElementById("btnStop").addEventListener("click", async () => {
+  await postAPI("/api/camera/stop");
+  setTimeout(updateStatus, 800);
+});
+
+updateStatus();
+setInterval(updateStatus, 4000);
+</script>
+
 {% endblock %}
