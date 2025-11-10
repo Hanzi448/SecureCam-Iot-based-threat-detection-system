@@ -10,7 +10,7 @@ def can_send(key: str = "global") -> bool:
     Returns True if an email may be sent for `key` right now.
     This implements a cooldown window defined by Config.EMAIL_COOLDOWN_SECONDS.
     """
-    cooldown = getattr(Config, "EMAIL_COOLDOWN_SECONDS", 60)  # default 60s
+    cooldown = getattr(Config, "EMAIL_COOLDOWN_SECONDS", 30)
     now = time.time()
     with _lock:
         last = _last_sent.get(key, 0)

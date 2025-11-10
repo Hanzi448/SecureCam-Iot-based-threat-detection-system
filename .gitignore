@@ -49,6 +49,3 @@ node_modules/
 # Other
 *.swp
 *.swo
-
-#Yolo in models folder
-models/yolo*

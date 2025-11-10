@@ -1,73 +1,62 @@
 # ml/yolo_wrapper.py
 import cv2
-import numpy as np
+import torch
+from ultralytics import YOLO
 from pathlib import Path
 
-# Paths to YOLOv4 model files
-BASE_DIR = Path(__file__).resolve().parents[1]
-CFG_PATH = str(BASE_DIR / "models" / "yolo" / "yolov4-weapon.cfg")
-WEIGHTS_PATH = str(BASE_DIR / "models" / "yolo" / "yolov4-weapon.weights")
-NAMES_PATH = str(BASE_DIR / "models" / "yolo" / "obj.names")
+class YOLOv8Detector:
+    def __init__(self, model_path="models/yolo/best.pt", names_path="models/yolo/obj.names", device=None):
+        # Load YOLOv8 model
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = YOLO(model_path)
+        self.model.to(self.device)
 
-# Load class names
-with open(NAMES_PATH, "r") as f:
-    CLASSES = [line.strip() for line in f.readlines()]
+        # Load class names
+        self.names = self._load_class_names(names_path)
 
-# Load YOLO network using OpenCV DNN
-net = cv2.dnn.readNetFromDarknet(CFG_PATH, WEIGHTS_PATH)
-net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+        # Detection thresholds
+        self.conf_thres = 0.4
+        self.iou_thres = 0.45
 
-# Determine output layer names
-layer_names = net.getLayerNames()
-output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers().flatten()]
+    def _load_class_names(self, path):
+        p = Path(path)
+        if p.exists():
+            return [line.strip() for line in p.read_text().splitlines() if line.strip()]
+        return []
 
-def predict(image, conf_thresh=0.4, nms_thresh=0.3):
-    """
-    Run YOLOv4 detection on a BGR OpenCV image.
-    Returns list of dicts: [{'label': str, 'conf': float, 'bbox': [x1,y1,x2,y2]}]
-    """
-    height, width = image.shape[:2]
-    blob = cv2.dnn.blobFromImage(image, 1/255.0, (416, 416), swapRB=True, crop=False)
-    net.setInput(blob)
-    outs = net.forward(output_layers)
+    def predict(self, img_bgr):
+        """Run YOLOv8 prediction on an OpenCV image (BGR)."""
+        results = self.model.predict(
+            source=img_bgr,
+            conf=self.conf_thres,
+            iou=self.iou_thres,
+            device=self.device,
+            verbose=False
+        )
 
-    class_ids, confidences, boxes = [], [], []
-    for out in outs:
-        for detection in out:
-            scores = detection[5:]
-            class_id = np.argmax(scores)
-            confidence = scores[class_id]
-            if confidence > conf_thresh:
-                center_x, center_y, w, h = (detection[0:4] * np.array([width, height, width, height])).astype("int")
-                x = int(center_x - w / 2)
-                y = int(center_y - h / 2)
-                boxes.append([x, y, int(w), int(h)])
-                confidences.append(float(confidence))
-                class_ids.append(class_id)
+        detections = []
+        for result in results:
+            for box in result.boxes:
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                conf = float(box.conf.cpu().numpy())
+                cls = int(box.cls.cpu().numpy())
+                label = self.names[cls] if cls < len(self.names) else f"class_{cls}"
 
-    # Non-max suppression to reduce overlapping boxes
-    indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_thresh, nms_thresh)
+                detections.append({
+                    "label": label,
+                    "conf": conf,
+                    "bbox": [int(x1), int(y1), int(x2), int(y2)]
+                })
 
-    detections = []
-    if len(indices) > 0:
-        for i in indices.flatten():
-            x, y, w, h = boxes[i]
-            detections.append({
-                "label": CLASSES[class_ids[i]],
-                "conf": round(confidences[i], 2),
-                "bbox": [x, y, x + w, y + h]
-            })
+        return detections
 
-    return detections
 
-# Quick self-test
-if __name__ == "__main__":
-    import cv2
-    img_path = str(BASE_DIR / "data" / "events" / "frame_2.jpg")
-    img = cv2.imread(img_path)
-    dets = predict(img)
-    if len(dets) == 0:
-        print("No detections")
-    else:
-        print(dets)
+# Singleton-style global detector
+_detector = None
+
+def predict(img):
+    """Predict using a globally cached model instance."""
+    global _detector
+    if _detector is None:
+        _detector = YOLOv8Detector()
+    return _detector.predict(img)

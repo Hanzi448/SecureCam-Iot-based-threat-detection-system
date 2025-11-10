@@ -5,7 +5,7 @@ import os
 import time
 import requests
 from pathlib import Path
-from ml.yolo_wrapper import predict
+from ml.yolo_wrapper import predict  # ✅ YOLOv8 wrapper
 from services.storage import upload_image
 from config import Config
 
@@ -31,20 +31,16 @@ for folder in [EVENTS_DIR, CROPS_DIR, OUTPUT_DIR]:
 # ESP32 Hardware Alert
 # ---------------------------------------------------
 def trigger_hardware_alert(alert_type: str):
-    """
-    Sends a trigger to ESP32 hardware via its /alert endpoint.
-    Example:
-      http://192.168.137.210/alert?alert=weapon
-    """
+    """Sends a trigger to ESP32 hardware via its /alert endpoint."""
     try:
-        esp_url = getattr(Config, "ESP32_ALERT_URL", "http://192.168.137.210")
+        esp_url = getattr(Config, "ESP32_ALERT_URL", None)
         if not esp_url:
             print("[ESP32] No ESP32_ALERT_URL configured.")
             return
 
         full_url = f"{esp_url}/alert?alert={alert_type}"
-        requests.get(full_url, timeout=3)
-        print(f"[ESP32] Hardware alert sent → {full_url}")
+        resp = requests.get(full_url, timeout=3)
+        print(f"[ESP32] Hardware alert sent → {full_url} ({resp.status_code})")
 
     except Exception as e:
         print(f"[ESP32 WARN] Could not send alert: {e}")
@@ -56,16 +52,17 @@ def trigger_hardware_alert(alert_type: str):
 def process_image(local_path: str):
     """
     Full detection pipeline:
-    - YOLO weapon detection
+    - YOLOv8 weapon detection
     - FaceNet criminal identification
-    - Suspicious/unknown person detection
+    - Suspicious/unknown person detection (only if occluded/masked)
     - Database + Email + Hardware alert triggers
     """
     img = cv2.imread(local_path)
     if img is None:
         return {"error": f"Could not read image {local_path}"}
 
-    detections = predict(img, conf_thresh=Config.WEAPON_CONF_THRESHOLD)
+    # ✅ YOLOv8 prediction
+    detections = predict(img)
 
     weapon_detected = False
     suspicious_detected = False
@@ -128,9 +125,31 @@ def process_image(local_path: str):
                     print(f"[FACENET] Criminal match found: {cname} (dist={dist:.3f})")
                     break
 
+            # ---- SUSPICIOUS CHECK: masked/occluded only ----
             if not face_matched:
-                suspicious_detected = True
-                print("[SUSPICIOUS] Unrecognized or masked face detected.")
+                try:
+                    bbox = face.get("bbox")
+                    if bbox:
+                        x1, y1, x2, y2 = map(int, bbox)
+                        face_img = img[y1:y2, x1:x2]
+                    else:
+                        face_img = face.get("crop")
+
+                    if face_img is not None and face_img.size > 0:
+                        gray = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
+                        lower_half = gray[gray.shape[0] // 2:, :]  # bottom half only
+                        variance = cv2.Laplacian(lower_half, cv2.CV_64F).var()
+
+                        if variance < 25:
+                            suspicious_detected = True
+                            print("[SUSPICIOUS] Possibly masked or occluded face detected.")
+                        else:
+                            print("[INFO] Unknown but clear face — not suspicious.")
+                    else:
+                        print("[INFO] Unknown face without valid crop — not marked suspicious.")
+                except Exception as e:
+                    print(f"[SUSPICIOUS CHECK WARN] {e}")
+
     except Exception as e:
         print(f"[FACENET WARN] {e}")
 
@@ -169,10 +188,8 @@ def process_image(local_path: str):
     # Send alerts
     try:
         if alert_type:
-            # Trigger buzzer/servo via ESP32
             trigger_hardware_alert(alert_type)
 
-            # Send email (cooldown controlled)
             throttle_key = (
                 f"criminal:{criminal_name}"
                 if Config.EMAIL_COOLDOWN_SCOPE == "per_criminal" and criminal_name

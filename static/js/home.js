@@ -1,5 +1,4 @@
 // static/js/home.js
-
 async function api(path, method = "GET") {
   try {
     const res = await fetch(path, { method });
@@ -17,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusText = document.getElementById("statusText");
 
   // ------------------------------
-  // Update camera status + UI
+  // Update Camera Status
   // ------------------------------
   async function refreshStatus() {
     try {
@@ -27,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btnStop.disabled = false;
         statusText.textContent = "Status: Running";
         statusText.className = "badge bg-success";
-        liveImg.src = "/api/camera/video_feed?ts=" + Date.now(); // ensure refresh
+        liveImg.src = "/api/camera/video_feed?ts=" + Date.now(); // ensure reload
       } else {
         btnStart.disabled = false;
         btnStop.disabled = true;
@@ -43,26 +42,29 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ------------------------------
-  // Start / Stop button handlers
+  // Start ESP32 Camera
   // ------------------------------
   btnStart.addEventListener("click", async () => {
     btnStart.disabled = true;
-    statusText.textContent = "Status: Starting...";
+    statusText.textContent = "Starting ESP32-Cam...";
     statusText.className = "badge bg-info text-dark";
 
     try {
       await api("/api/camera/start", "POST");
-      console.log("Camera started");
+      console.log("ESP32 camera started");
     } catch (e) {
-      alert("Failed to start camera.");
+      alert("Failed to start ESP32 camera.");
       console.error(e);
     }
-    setTimeout(refreshStatus, 800);
+    setTimeout(refreshStatus, 1000);
   });
 
+  // ------------------------------
+  // Stop Camera
+  // ------------------------------
   btnStop.addEventListener("click", async () => {
     btnStop.disabled = true;
-    statusText.textContent = "Status: Stopping...";
+    statusText.textContent = "Stopping...";
     statusText.className = "badge bg-secondary";
 
     try {
@@ -76,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ------------------------------
-  // Auto-refresh status
+  // Auto Refresh Status
   // ------------------------------
   refreshStatus();
   setInterval(refreshStatus, 4000);
