@@ -220,7 +220,51 @@ python capture_and_post.py
 - Add **MQTT** or **WebSocket** support for real-time event streaming.  
 - Integrate **license plate detection** for vehicles.  
 - Add **user management dashboard** for admins.  
-- Include **offline fallback mode** for local-only alerts.  
+- Include **offline fallback mode** for local-only alerts.
+
+---
+
+## Demo Screenshots
+
+### Live ESP32-CAM Video Stream
+<p align="center">
+  <img src="screenshots/Live Feed.jpeg" alt="Live ESP32 Camera Stream" width="100%"/>
+</p>
+
+---
+
+### Weapon Detection (YOLOv8 – Real-Time)
+<p align="center">
+  <img src="screenshots/Weapon Detection.jpeg" alt="Weapon Detection" width="100%"/>
+</p>
+
+---
+
+### Known Criminal Identification (FaceNet)
+<p align="center">
+  <img src="screenshots/Criminal Detection.jpeg" alt="Criminal Recognition" width="100%"/>
+</p>
+
+---
+
+### Email Alert with Annotated Evidence (Weapon Detection)
+<p align="center">
+  <img src="screenshots/Weapon Detected Email.jpeg" alt="Email Alert Notification (Weapon)" width="100%"/>
+</p>
+
+---
+
+### Email Alert with Annotated Evidence (Criminal Recognition)
+<p align="center">
+  <img src="screenshots/Criminal Identified Email.jpeg" alt="Email Alert Notification (Criminal)" width="100%"/>
+</p>
+
+---
+
+### Web Dashboard (Flask Monitoring Panel)
+<p align="center">
+  <img src="screenshots/Dashboard.jpeg" alt="Web Dashboard" width="100%"/>
+</p>
 
 ---
 
@@ -239,3 +283,4 @@ You are free to use, modify, and distribute it for educational or research purpo
 ---
 
 **SecureCam** — “Because smart surveillance should not just watch, but *protect*.”
+
