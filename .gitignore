@@ -32,15 +32,8 @@ build/
 # Node.js (if applicable)
 node_modules/
 
-# Images and videos (if generated)
-*.jpg
-*.jpeg
-*.png
-*.bmp
-*.gif
-*.mp4
-*.avi
-*.mov
+# data
+data/
 
 # Database files
 *.sqlite3
